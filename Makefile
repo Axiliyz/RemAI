@@ -1,32 +1,34 @@
-.PHONY: up down restart ps logs config db-shell test run build fmt vet lint check swagger
-APP_NAME := RemAI
+include .env
+export
 
+.PHONY: docker-build docker-up docker-down docker-restart docker-logs
+.PHONY: migrate-create migrate-up migrate-down migrate-action
+
+APP_NAME := RemAI
+DOCKER_COMPOSE := docker compose -f deployments/docker-compose.yml
 
 # INFRA
-COMPOSE := docker compose --env-file .env -f deployments/docker-compose.yml
 
-up:
-	@$(COMPOSE) up -d
+docker-build:
+	@$(DOCKER_COMPOSE) build
+	@$(DOCKER_COMPOSE) up -d
 
-down:
-	@$(COMPOSE) down
+docker-up:
+	@$(DOCKER_COMPOSE) up -d
 
-restart:
-	@$(COMPOSE) restart
+docker-down:
+	@$(DOCKER_COMPOSE) down
 
-ps:
-	@$(COMPOSE) ps -a
+docker-restart:
+	@$(DOCKER_COMPOSE) restart
 
-logs:
-	@$(COMPOSE) logs -f
-
-db-shell:
-	@$(COMPOSE) exec postgres psql -U rem -d rem_ai
+docker-logs:
+	@$(DOCKER_COMPOSE) logs -f
 
 # GOLANG
 
 run:
-	@go run ./cmd/api
+	@set -a; . ./.env; set +a; go run ./cmd/api
 
 build:
 	@go build -o bin/$(APP_NAME) ./cmd/api
@@ -45,7 +47,30 @@ lint:
 
 check: fmt vet test lint
 
-# SWAGGER
+# MIGRATIONS
 
-swagger:
-	@go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o docs
+migrate-create:
+	@if [ -z "$(seq)" ]; then \
+		echo "отсутствует параметр seq, пример: make migrate-create seq=init"; \
+		exit 1; \
+	fi
+	@$(DOCKER_COMPOSE) run --rm migrate \
+		create \
+		-ext sql \
+		-dir /migrations \
+		-seq $(seq)
+
+migrate-up:
+	@$(MAKE) migrate-action action=up
+migrate-down:
+	@$(MAKE) migrate-action action=down
+
+migrate-action:
+	@if [ -z "$(action)" ]; then \
+		echo "отсутствует параметр action, пример: make migrate-action action=up"; \
+		exit 1; \
+	fi
+	@$(DOCKER_COMPOSE) run --rm migrate \
+		-path /migrations \
+		-database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?sslmode=disable" \
+		$(action)

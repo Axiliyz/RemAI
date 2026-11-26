@@ -16,5 +16,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+  migrate:
+    image: migrate/migrate
+    volumes:
+      - ../migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["migrate"]
 volumes:
   postgres_data:
