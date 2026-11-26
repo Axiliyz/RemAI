@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"time"
 )
 
-type HealthRespone struct {
+type HealthResponse struct {
 	Status string `json:"status"`
 }
 
@@ -17,7 +18,7 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		response := HealthRespone{
+		response := HealthResponse{
 			Status: "ok",
 		}
 
@@ -35,7 +36,7 @@ func main() {
 		MaxHeaderBytes:    1 << 20,
 	}
 	log.Println("RemAI started on :8080")
-	if err := server.ListenAndServe(); err != nil {
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
 }
